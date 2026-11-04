@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5f0">
+  <title>Devocional — juntos na Palavra</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Devocional, página inicial">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span>devocional<span class="brand-period">.</span></span>
+      </a>
+      <span class="local-badge"><span aria-hidden="true"></span> Seus registros ficam neste dispositivo</span>
+    </header>
+
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">UM DIA DE CADA VEZ</p>
+      <h1 id="page-title">Caminhem juntos<br>na <span>Palavra.</span></h1>
+      <p class="intro-copy">Acompanhe seus momentos de devocional e celebre a constância, dia após dia.</p>
+    </section>
+
+    <section class="tracker" aria-label="Calendário de devocionais">
+      <div class="tracker-top">
+        <div class="month-controls">
+          <button class="icon-button" id="previous-month" type="button" aria-label="Mês anterior">‹</button>
+          <h2 id="month-title" aria-live="polite"></h2>
+          <button class="icon-button" id="next-month" type="button" aria-label="Próximo mês">›</button>
+        </div>
+        <button class="today-button" id="go-today" type="button">Hoje</button>
+      </div>
+
+      <div class="progress-row">
+        <div>
+          <p class="progress-title">Sua constância neste mês</p>
+          <p class="progress-caption" id="progress-caption">Carregando seus registros...</p>
+        </div>
+        <div class="progress-count" id="progress-count" aria-label="Dias registrados">—</div>
+      </div>
+      <div class="progress-track" role="progressbar" aria-label="Dias do mês com devocional" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span id="progress-fill"></span>
+      </div>
+
+      <form class="name-form" id="name-form">
+        <label for="participant-name">Quem está registrando?</label>
+        <div class="name-input-wrap">
+          <span aria-hidden="true">✎</span>
+          <input id="participant-name" name="participant" type="text" maxlength="80" autocomplete="name" placeholder="Digite seu nome" required>
+        </div>
+        <p>Toque em um dia para marcar ou desmarcar seu devocional.</p>
+      </form>
+
+      <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
+      <div class="weekday-row" aria-hidden="true">
+        <span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span><span>DOM</span>
+      </div>
+      <div class="calendar-grid" id="calendar" aria-label="Dias do mês"></div>
+      <div class="legend"><span class="legend-dot"></span> Dia com registro</div>
+    </section>
+
+    <footer>Pequenos momentos, grandes raízes.</footer>
+  </main>
+</body>
+</html>
