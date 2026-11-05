@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      NEON_CONNECTION_STRING: ${NEON_CONNECTION_STRING:-}
       ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB:-devocional};Username=${POSTGRES_USER:?Configure POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in .env}
     depends_on:
       db:

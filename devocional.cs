@@ -3,12 +3,16 @@ using System.Text;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-var connectionString = builder.Configuration.GetConnectionString("Default");
+var connectionString = builder.Configuration["NEON_CONNECTION_STRING"];
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = builder.Configuration.GetConnectionString("Default");
+}
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "Configure a conexão PostgreSQL em ConnectionStrings:Default.");
+        "Configure NEON_CONNECTION_STRING ou ConnectionStrings:Default com uma conexão PostgreSQL.");
 }
 
 await using var dataSource = NpgsqlDataSource.Create(connectionString);
