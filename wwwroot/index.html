@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f5f0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <title>Devocional — juntos na Palavra</title>
-  <link rel="stylesheet" href="/styles.css?v=7">
-  <script src="/app.js?v=7" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=9">
+  <script src="/app.js?v=9" defer></script>
 </head>
 <body>
   <main class="page-shell">
@@ -51,7 +52,7 @@
           <span aria-hidden="true">✎</span>
         <input id="participant-name" name="participant" type="text" maxlength="80" autocomplete="name" placeholder="Seu nome" required>
         </div>
-        <p>Seu nome fica salvo neste aparelho. Toque em um dia para registrar ou remover.</p>
+        <p>Seu nome fica salvo neste aparelho. Toque em um dia para ver os temas ou registrar o seu.</p>
       </form>
 
       <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
@@ -60,6 +61,26 @@
       </div>
       <div class="calendar-grid" id="calendar" aria-label="Dias do mês"></div>
       <div class="legend"><span class="legend-dot"></span> Dia com registro</div>
+
+      <dialog class="record-dialog" id="record-dialog" aria-labelledby="record-dialog-title">
+        <form class="record-form" id="record-form">
+          <p class="eyebrow">DEVOCIONAL DO DIA</p>
+          <h2 id="record-dialog-title" tabindex="-1"></h2>
+          <p class="dialog-copy">Registre o tema que você estudou. Ele ficará visível para todos neste calendário.</p>
+          <label for="devotional-theme">Tema do devocional <span>(opcional)</span></label>
+          <input id="devotional-theme" name="tema" type="text" maxlength="200" placeholder="Ex.: A fé em tempos difíceis">
+          <p class="theme-hint">Até 200 caracteres.</p>
+          <p class="dialog-status" id="dialog-status" role="status" aria-live="polite"></p>
+          <div class="day-records" id="day-records" aria-live="polite"></div>
+          <div class="dialog-actions">
+            <button class="remove-record" id="remove-record" type="button" hidden>Remover meu registro</button>
+            <div class="dialog-primary-actions">
+              <button class="cancel-record" id="cancel-record" type="button">Cancelar</button>
+              <button class="save-record" id="save-record" type="submit">Salvar registro</button>
+            </div>
+          </div>
+        </form>
+      </dialog>
     </section>
 
     <footer>Pequenos momentos, grandes raízes.</footer>

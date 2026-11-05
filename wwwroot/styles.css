@@ -261,6 +261,53 @@ h1 span { color: var(--green); font-style: italic; }
 .day-check { color: var(--green-dark); font-size: 11px; font-weight: 800; line-height: 1; }
 .legend { display: flex; align-items: center; gap: 8px; margin-top: 15px; color: #727d73; font-size: 11px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; background: #8ea98b; }
+.record-dialog {
+  width: min(100% - 32px, 460px);
+  max-height: min(90vh, 720px);
+  padding: 26px;
+  border: 1px solid rgba(220, 222, 211, .9);
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 20px 70px rgba(30, 45, 34, .24);
+}
+.record-dialog::backdrop { background: rgba(31, 43, 35, .42); backdrop-filter: blur(2px); }
+.record-form .eyebrow { margin-bottom: 8px; }
+.record-form h2 { margin-bottom: 8px; font-family: Georgia, serif; font-size: 23px; font-weight: 600; text-transform: capitalize; }
+.dialog-copy { margin-bottom: 20px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.record-form > label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 700; }
+.record-form > label span { color: var(--muted); font-weight: 400; }
+.record-form input {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: 0;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+}
+.record-form input:focus { border-color: #9eb29f; box-shadow: 0 0 0 3px #edf2eb; }
+.record-form input::placeholder { color: #a0a89f; }
+.theme-hint { margin: 5px 0 16px; color: var(--muted); font-size: 10px; }
+.dialog-status:not(:empty) { margin: 0 0 12px; color: #536e54; font-size: 11px; line-height: 1.45; }
+.dialog-status.is-error { color: #984b3d; }
+.day-records { padding: 12px; border-radius: 10px; background: #f7f8f3; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.day-records-title { margin: 0 0 7px; color: var(--ink); font-size: 11px; font-weight: 700; }
+.day-records ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.day-records li { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.day-records li strong { color: var(--green-dark); }
+.no-theme { color: #92978d; font-style: italic; }
+.dialog-actions, .dialog-primary-actions { display: flex; align-items: center; }
+.dialog-actions { justify-content: space-between; gap: 12px; margin-top: 20px; }
+.dialog-primary-actions { gap: 8px; }
+.dialog-actions button { min-height: 42px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; background: #fff; cursor: pointer; font-size: 11px; font-weight: 700; }
+.dialog-actions button:disabled { cursor: wait; opacity: .6; }
+.dialog-actions .save-record { border-color: var(--green-dark); background: var(--green-dark); color: #fff; }
+.dialog-actions .remove-record { border-color: #f0d7d1; color: #984b3d; }
+.dialog-actions .remove-record[hidden] { display: none; }
 footer { padding-top: 22px; color: #92978d; font-family: Georgia, serif; font-size: 12px; font-style: italic; text-align: center; }
 
 button:focus-visible, input:focus-visible { outline: 3px solid #739177; outline-offset: 3px; }
@@ -298,6 +345,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid #739177; outline-
   .day-more { font-size: 8px; }
   .day-markers { gap: 2px; min-height: 10px; }
   .legend { margin-top: 12px; font-size: 10px; }
+  .record-dialog { padding: 21px 17px; border-radius: 15px; }
+  .record-form h2 { font-size: 21px; }
+  .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
+  .dialog-primary-actions { justify-content: flex-end; }
+  .dialog-actions .remove-record { align-self: flex-start; }
   footer { padding-top: 18px; font-size: 11px; }
 }
 

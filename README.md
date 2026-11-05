@@ -51,8 +51,12 @@ O banco local ainda inicia pelo Compose, mas o app usa `DATABASE_URL`. Não colo
 
 Na inicialização, o app cria a tabela `registros` se ela ainda não existir; o usuário PostgreSQL precisa ter permissão para criar e modificar essa tabela.
 
-- `GET /api/devocional/{ano}/{mes}` lista os registros do mês.
-- `POST /api/devocional/alternar` recebe `{"data":"AAAA-MM-DD","usuario":"Nome"}` e alterna o registro.
+- `GET /api/devocional/{ano}/{mes}` lista os registros do mês com o nome e tema de cada pessoa.
+- `POST /api/devocional/alternar` recebe `{"data":"AAAA-MM-DD","usuario":"Nome","tema":"Tema estudado"}` e alterna o registro.
+- `PUT /api/devocional` cria ou atualiza o registro da pessoa e recebe `{"data":"AAAA-MM-DD","usuario":"Nome","tema":"Tema estudado"}`; o tema é opcional e tem limite de 200 caracteres.
+- `DELETE /api/devocional` remove o registro da pessoa e recebe `{"data":"AAAA-MM-DD","usuario":"Nome"}`.
 - `GET /healthz` verifica a saúde da aplicação.
 
-O site e os registros são públicos e compartilhados. Não há login: qualquer visitante pode registrar um nome e marcar ou desmarcar devocionais, inclusive registros atribuídos a outros nomes. Não use dados pessoais ou informações que precisem de controle de acesso.
+A coluna de tema é adicionada automaticamente na inicialização; os registros existentes continuam válidos e começam sem tema. O retorno mensal tem o formato `{"registros":{"AAAA-MM-DD":[{"usuario":"Nome","tema":"Tema estudado"}]}}`.
+
+O site e os registros são públicos e compartilhados. Não há login: qualquer visitante pode registrar um nome e criar, editar ou remover registros atribuídos a qualquer nome. Cada tema fica associado ao registro daquela pessoa no dia. Não use dados pessoais ou informações que precisem de controle de acesso.

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,9 +35,12 @@ await using (var connection = await dataSource.OpenConnectionAsync())
             data DATE NOT NULL,
             usuario TEXT NOT NULL,
             usuario_normalizado TEXT NOT NULL,
+            tema TEXT NOT NULL DEFAULT '',
             PRIMARY KEY (data, usuario_normalizado)
         );
         """;
+    await command.ExecuteNonQueryAsync();
+    command.CommandText = "ALTER TABLE registros ADD COLUMN IF NOT EXISTS tema TEXT NOT NULL DEFAULT '';";
     await command.ExecuteNonQueryAsync();
 }
 
@@ -53,6 +57,12 @@ app.MapGet("/api/devocional/{ano:int}/{mes:int}", (int ano, int mes) =>
 app.MapPost("/api/devocional/alternar", (RegistroDTO? dto) =>
     ToggleRecordAsync(dto, dataSource));
 
+app.MapPut("/api/devocional", (RegistroDTO? dto) =>
+    SaveRecordAsync(dto, dataSource));
+
+app.MapDelete("/api/devocional", ([FromBody] RegistroDTO? dto) =>
+    DeleteRecordAsync(dto, dataSource));
+
 await app.RunAsync();
 
 static async Task<IResult> GetMonthAsync(int ano, int mes, NpgsqlDataSource dataSource)
@@ -64,12 +74,12 @@ static async Task<IResult> GetMonthAsync(int ano, int mes, NpgsqlDataSource data
 
     var primeiroDia = new DateOnly(ano, mes, 1);
     var ultimoDia = new DateOnly(ano, mes, DateTime.DaysInMonth(ano, mes));
-    var resultado = new SortedDictionary<string, List<string>>();
+    var resultado = new SortedDictionary<string, List<RegistroResumo>>();
 
     await using var connection = await dataSource.OpenConnectionAsync();
     await using var command = connection.CreateCommand();
     command.CommandText = """
-        SELECT data, usuario
+        SELECT data, usuario, tema
         FROM registros
         WHERE data BETWEEN @primeiroDia AND @ultimoDia
         ORDER BY data, usuario_normalizado;
@@ -88,34 +98,19 @@ static async Task<IResult> GetMonthAsync(int ano, int mes, NpgsqlDataSource data
             resultado.Add(data, pessoas);
         }
 
-        pessoas.Add(reader.GetString(1));
+        pessoas.Add(new RegistroResumo(reader.GetString(1), reader.GetString(2)));
     }
 
-    return Results.Ok(resultado);
+    return Results.Ok(new { registros = resultado });
 }
 
 static async Task<IResult> ToggleRecordAsync(RegistroDTO? dto, NpgsqlDataSource dataSource)
 {
-    if (dto is null ||
-        !DateOnly.TryParseExact(
-            dto.Data,
-            "yyyy-MM-dd",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out var data))
+    if (!TryParseRecord(dto, out var data, out var usuario, out var usuarioNormalizado, out var tema, out var erro))
     {
-        return Results.BadRequest(new { erro = "Informe uma data válida no formato AAAA-MM-DD." });
+        return Results.BadRequest(new { erro });
     }
 
-    var usuario = dto.Usuario?.Trim().Normalize(NormalizationForm.FormC);
-    if (string.IsNullOrWhiteSpace(usuario) ||
-        usuario.Length > 80 ||
-        usuario.Any(char.IsControl))
-    {
-        return Results.BadRequest(new { erro = "Informe um nome com até 80 caracteres." });
-    }
-
-    var usuarioNormalizado = usuario.ToUpperInvariant();
     await using var connection = await dataSource.OpenConnectionAsync();
     await using (var transaction = await connection.BeginTransactionAsync())
     {
@@ -139,14 +134,15 @@ static async Task<IResult> ToggleRecordAsync(RegistroDTO? dto, NpgsqlDataSource 
         command.CommandText = jaRegistrado
             ? "DELETE FROM registros WHERE data = @data AND usuario_normalizado = @usuarioNormalizado;"
             : """
-              INSERT INTO registros (data, usuario, usuario_normalizado)
-              VALUES (@data, @usuario, @usuarioNormalizado);
+              INSERT INTO registros (data, usuario, usuario_normalizado, tema)
+              VALUES (@data, @usuario, @usuarioNormalizado, @tema);
               """;
         command.Parameters.AddWithValue("data", data);
         command.Parameters.AddWithValue("usuarioNormalizado", usuarioNormalizado);
         if (!jaRegistrado)
         {
             command.Parameters.AddWithValue("usuario", usuario);
+            command.Parameters.AddWithValue("tema", tema);
         }
 
         await command.ExecuteNonQueryAsync();
@@ -171,6 +167,101 @@ static async Task<IResult> ToggleRecordAsync(RegistroDTO? dto, NpgsqlDataSource 
     }
 
     return Results.Ok(new { Data = data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Pessoas = pessoas });
+}
+
+static async Task<IResult> SaveRecordAsync(RegistroDTO? dto, NpgsqlDataSource dataSource)
+{
+    if (!TryParseRecord(dto, out var data, out var usuario, out var usuarioNormalizado, out var tema, out var erro))
+    {
+        return Results.BadRequest(new { erro });
+    }
+
+    await using var connection = await dataSource.OpenConnectionAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO registros (data, usuario, usuario_normalizado, tema)
+        VALUES (@data, @usuario, @usuarioNormalizado, @tema)
+        ON CONFLICT (data, usuario_normalizado)
+        DO UPDATE SET usuario = EXCLUDED.usuario, tema = EXCLUDED.tema;
+        """;
+    command.Parameters.AddWithValue("data", data);
+    command.Parameters.AddWithValue("usuario", usuario);
+    command.Parameters.AddWithValue("usuarioNormalizado", usuarioNormalizado);
+    command.Parameters.AddWithValue("tema", tema);
+    await command.ExecuteNonQueryAsync();
+
+    return Results.Ok(new
+    {
+        data = data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        usuario,
+        tema
+    });
+}
+
+static async Task<IResult> DeleteRecordAsync(RegistroDTO? dto, NpgsqlDataSource dataSource)
+{
+    if (!TryParseRecord(dto, out var data, out _, out var usuarioNormalizado, out _, out var erro))
+    {
+        return Results.BadRequest(new { erro });
+    }
+
+    await using var connection = await dataSource.OpenConnectionAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+        DELETE FROM registros
+        WHERE data = @data AND usuario_normalizado = @usuarioNormalizado;
+        """;
+    command.Parameters.AddWithValue("data", data);
+    command.Parameters.AddWithValue("usuarioNormalizado", usuarioNormalizado);
+    var removidos = await command.ExecuteNonQueryAsync();
+
+    return Results.Ok(new { removido = removidos > 0 });
+}
+
+static bool TryParseRecord(
+    RegistroDTO? dto,
+    out DateOnly data,
+    out string usuario,
+    out string usuarioNormalizado,
+    out string tema,
+    out string erro)
+{
+    data = default;
+    usuario = string.Empty;
+    usuarioNormalizado = string.Empty;
+    tema = string.Empty;
+    erro = string.Empty;
+
+    if (dto is null ||
+        !DateOnly.TryParseExact(
+            dto.Data,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out data))
+    {
+        erro = "Informe uma data válida no formato AAAA-MM-DD.";
+        return false;
+    }
+
+    usuario = dto.Usuario?.Trim().Normalize(NormalizationForm.FormC) ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(usuario) ||
+        usuario.Length > 80 ||
+        usuario.Any(char.IsControl))
+    {
+        erro = "Informe um nome com até 80 caracteres.";
+        return false;
+    }
+
+    usuarioNormalizado = usuario.ToUpperInvariant();
+    tema = dto.Tema?.Trim().Normalize(NormalizationForm.FormC) ?? string.Empty;
+    if (tema.Length > 200 || tema.Any(char.IsControl))
+    {
+        erro = "Informe um tema com até 200 caracteres.";
+        return false;
+    }
+
+    return true;
 }
 
 static string? ReadLocalDatabaseUrl(string contentRootPath)
@@ -272,4 +363,5 @@ static string ToNpgsqlConnectionString(string databaseUrl)
     return connectionString.ConnectionString;
 }
 
-record RegistroDTO(string Data, string Usuario);
+record RegistroDTO(string Data, string Usuario, string? Tema = null);
+record RegistroResumo(string Usuario, string Tema);
