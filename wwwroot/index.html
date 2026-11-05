@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f5f0">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
   <title>Devocional — juntos na Palavra</title>
-  <link rel="stylesheet" href="/styles.css?v=9">
-  <script src="/app.js?v=9" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=10">
+  <script src="/app.js?v=10" defer></script>
 </head>
 <body>
   <main class="page-shell">
@@ -54,6 +56,18 @@
         </div>
         <p>Seu nome fica salvo neste aparelho. Toque em um dia para ver os temas ou registrar o seu.</p>
       </form>
+
+      <section class="reminder-card" aria-labelledby="reminder-title">
+        <div class="reminder-copy">
+          <h2 id="reminder-title">Lembrete diário</h2>
+          <p>Receba um aviso às 22h30 se ainda não registrou seu devocional hoje.</p>
+        </div>
+        <div class="reminder-actions">
+          <button class="reminder-button" id="enable-reminder" type="button">Ativar lembrete</button>
+          <button class="reminder-button is-secondary" id="disable-reminder" type="button" hidden>Desativar</button>
+        </div>
+        <p class="reminder-status" id="reminder-status" role="status" aria-live="polite">A ativação vale para este aparelho. No iPhone ou iPad, adicione o site à Tela de Início antes de ativar.</p>
+      </section>
 
       <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
       <div class="weekday-row" aria-hidden="true">

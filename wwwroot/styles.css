@@ -205,6 +205,37 @@ h1 span { color: var(--green); font-style: italic; }
   font-size: 16px;
 }
 
+.reminder-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 20px 0 16px;
+  padding: 14px 15px;
+  border: 1px solid #e8ece3;
+  border-radius: 12px;
+  background: #f7f8f3;
+}
+.reminder-copy h2 { margin: 0 0 4px; font-size: 12px; font-weight: 700; }
+.reminder-copy p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.reminder-actions { display: flex; align-items: center; gap: 8px; }
+.reminder-button {
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--green-dark);
+  border-radius: 9px;
+  background: var(--green-dark);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.reminder-button.is-secondary { border-color: var(--line); background: white; color: var(--green-dark); }
+.reminder-button:disabled { cursor: wait; opacity: .6; }
+.reminder-button[hidden] { display: none; }
+.reminder-status { grid-column: 1 / -1; margin: 0; color: #788278; font-size: 10px; line-height: 1.45; }
+.reminder-status.is-error { color: #984b3d; }
+
 .status-message {
   display: none;
   margin: 0 0 12px;
@@ -335,6 +366,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid #739177; outline-
   .name-form > p { grid-column: auto; margin: 0; font-size: 10px; }
   .name-input-wrap { min-height: 48px; }
   .name-input-wrap input { padding: 11px 0; font-size: 16px; }
+  .reminder-card { grid-template-columns: 1fr; gap: 10px; margin: 16px 0 13px; padding: 13px; }
+  .reminder-actions { width: 100%; }
+  .reminder-button { flex: 1; }
   .status-message { font-size: 12px; }
   .weekday-row { margin-bottom: 5px; font-size: 9px; }
   .weekday-row span { padding: 8px 0; }

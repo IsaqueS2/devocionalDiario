@@ -1,0 +1,38 @@
+name: Enviar lembretes do devocional
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: devotional-reminder-scheduler
+  cancel-in-progress: false
+
+jobs:
+  send-reminders:
+    if: ${{ vars.RENDER_APP_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Processar lembretes pendentes
+        env:
+          RENDER_APP_URL: ${{ vars.RENDER_APP_URL }}
+          REMINDER_CRON_TOKEN: ${{ secrets.REMINDER_CRON_TOKEN }}
+        run: |
+          if [ -z "$REMINDER_CRON_TOKEN" ]; then
+            echo "::notice::Configure o segredo REMINDER_CRON_TOKEN para ativar os lembretes."
+            exit 0
+          fi
+
+          case "$RENDER_APP_URL" in
+            https://*) ;;
+            *) echo "::error::RENDER_APP_URL precisa usar HTTPS."; exit 1 ;;
+          esac
+
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --request POST \
+            --header "Authorization: Bearer $REMINDER_CRON_TOKEN" \
+            "${RENDER_APP_URL%/}/api/notificacoes/processar"

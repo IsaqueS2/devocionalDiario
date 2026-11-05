@@ -1,6 +1,9 @@
 const monthTitle = document.querySelector("#month-title");
 const calendar = document.querySelector("#calendar");
 const participantInput = document.querySelector("#participant-name");
+const enableReminderButton = document.querySelector("#enable-reminder");
+const disableReminderButton = document.querySelector("#disable-reminder");
+const reminderStatus = document.querySelector("#reminder-status");
 const recordDialog = document.querySelector("#record-dialog");
 const recordForm = document.querySelector("#record-form");
 const dialogTitle = document.querySelector("#record-dialog-title");
@@ -20,10 +23,154 @@ let displayedMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 let records = {};
 let isLoading = false;
 let selectedDate = "";
+let reminderRegistration = null;
+let reminderSubscription = null;
+let reminderSyncTimer = 0;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("is-error", isError);
+}
+
+function setReminderStatus(message, isError = false) {
+  reminderStatus.textContent = message;
+  reminderStatus.classList.toggle("is-error", isError);
+}
+
+function updateReminderControls() {
+  const active = Boolean(reminderSubscription);
+  enableReminderButton.hidden = active;
+  disableReminderButton.hidden = !active;
+}
+
+async function initializeReminder() {
+  if (!("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !("Notification" in window)) {
+    enableReminderButton.disabled = true;
+    setReminderStatus("Este navegador não oferece suporte a notificações push.");
+    return;
+  }
+
+  try {
+    reminderRegistration = await navigator.serviceWorker.register("/service-worker.js");
+    await navigator.serviceWorker.ready;
+    reminderSubscription = await reminderRegistration.pushManager.getSubscription();
+    updateReminderControls();
+    if (reminderSubscription && participantInput.value.trim()) {
+      try {
+        await saveReminderSubscription(reminderSubscription);
+        setReminderStatus("Lembrete ativo neste aparelho para as 22h30.");
+      } catch (error) {
+        setReminderStatus(error instanceof Error ? error.message : "Não foi possível atualizar o lembrete.", true);
+      }
+    } else if (reminderSubscription) {
+      await removeSavedReminderSubscription(reminderSubscription);
+    }
+  } catch (error) {
+    enableReminderButton.disabled = true;
+    setReminderStatus(error instanceof Error
+      ? `Não foi possível preparar as notificações: ${error.message}`
+      : "Não foi possível preparar as notificações.", true);
+  }
+}
+
+async function removeSavedReminderSubscription(subscription) {
+  const response = await fetch("/api/notificacoes/inscricao", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint: subscription.endpoint })
+  });
+  if (!response.ok) {
+    throw new Error("Não foi possível atualizar a inscrição de notificações.");
+  }
+}
+
+function decodeVapidPublicKey(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+async function saveReminderSubscription(subscription) {
+  const usuario = participantInput.value.trim();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const response = await fetch("/api/notificacoes/inscricao", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario, timezone, subscription: subscription.toJSON() })
+  });
+  if (!response.ok) {
+    const body = await response.json();
+    throw new Error(body.detail || body.erro || "Não foi possível salvar a inscrição de notificações.");
+  }
+}
+
+async function enableReminder() {
+  const usuario = participantInput.value.trim();
+  if (!usuario) {
+    setReminderStatus("Informe seu nome antes de ativar o lembrete.", true);
+    participantInput.focus();
+    return;
+  }
+  if (!window.isSecureContext) {
+    setReminderStatus("As notificações precisam de uma conexão HTTPS.", true);
+    return;
+  }
+
+  enableReminderButton.disabled = true;
+  setReminderStatus("Preparando o lembrete...");
+  try {
+    if (!reminderRegistration) {
+      reminderRegistration = await navigator.serviceWorker.register("/service-worker.js");
+    }
+
+    const keyResponse = await fetch("/api/notificacoes/chave-publica");
+    if (!keyResponse.ok) {
+      const body = await keyResponse.json();
+      throw new Error(body.detail || "O servidor ainda não foi configurado para enviar notificações.");
+    }
+    const { chavePublica } = await keyResponse.json();
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      throw new Error(permission === "denied"
+        ? "As notificações estão bloqueadas nas permissões do navegador."
+        : "Permita as notificações para ativar o lembrete.");
+    }
+
+    reminderSubscription = await reminderRegistration.pushManager.getSubscription()
+      ?? await reminderRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeVapidPublicKey(chavePublica)
+      });
+    await saveReminderSubscription(reminderSubscription);
+    updateReminderControls();
+    setReminderStatus("Lembrete ativo neste aparelho para as 22h30.");
+  } catch (error) {
+    setReminderStatus(error instanceof Error ? error.message : "Não foi possível ativar o lembrete.", true);
+  } finally {
+    enableReminderButton.disabled = false;
+  }
+}
+
+async function disableReminder() {
+  disableReminderButton.disabled = true;
+  setReminderStatus("Desativando o lembrete...");
+  try {
+    const subscription = reminderSubscription
+      ?? await reminderRegistration?.pushManager.getSubscription();
+    if (subscription) {
+      await removeSavedReminderSubscription(subscription);
+      await subscription.unsubscribe();
+    }
+    reminderSubscription = null;
+    updateReminderControls();
+    setReminderStatus("Lembrete desativado neste aparelho.");
+  } catch (error) {
+    setReminderStatus(error instanceof Error ? error.message : "Não foi possível desativar o lembrete.", true);
+  } finally {
+    disableReminderButton.disabled = false;
+  }
 }
 
 try {
@@ -37,6 +184,7 @@ document.querySelector("#next-month").addEventListener("click", () => changeMont
 document.querySelector("#go-today").addEventListener("click", () => {
   displayedMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   loadMonth();
+  initializeReminder();
 });
 document.querySelector("#name-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -45,6 +193,8 @@ document.querySelector("#name-form").addEventListener("submit", (event) => {
 document.querySelector("#cancel-record").addEventListener("click", () => recordDialog.close());
 recordForm.addEventListener("submit", saveRecord);
 removeRecordButton.addEventListener("click", deleteRecord);
+enableReminderButton.addEventListener("click", enableReminder);
+disableReminderButton.addEventListener("click", disableReminder);
 window.addEventListener("resize", updateMonthTitle);
 participantInput.addEventListener("input", () => {
   setStatus("");
@@ -54,6 +204,19 @@ participantInput.addEventListener("input", () => {
     // O cadastro no banco continua funcionando sem persistir esta preferência no navegador.
   }
   renderCalendar();
+  if (reminderSubscription) {
+    window.clearTimeout(reminderSyncTimer);
+    reminderSyncTimer = window.setTimeout(() => {
+      const update = participantInput.value.trim()
+        ? saveReminderSubscription(reminderSubscription)
+        : removeSavedReminderSubscription(reminderSubscription).then(() => {
+          setReminderStatus("Informe seu nome para manter o lembrete associado ao calendário.");
+        });
+      update.catch((error) => {
+        setReminderStatus(error instanceof Error ? error.message : "Não foi possível atualizar o lembrete.", true);
+      });
+    }, 700);
+  }
 });
 
 function changeMonth(offset) {

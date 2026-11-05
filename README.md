@@ -60,3 +60,31 @@ Na inicialização, o app cria a tabela `registros` se ela ainda não existir; o
 A coluna de tema é adicionada automaticamente na inicialização; os registros existentes continuam válidos e começam sem tema. O retorno mensal tem o formato `{"registros":{"AAAA-MM-DD":[{"usuario":"Nome","tema":"Tema estudado"}]}}`.
 
 O site e os registros são públicos e compartilhados. Não há login: qualquer visitante pode registrar um nome e criar, editar ou remover registros atribuídos a qualquer nome. Cada tema fica associado ao registro daquela pessoa no dia. Não use dados pessoais ou informações que precisem de controle de acesso.
+
+## Lembretes diários às 22h30
+
+O site permite ativar notificações push por aparelho. O lembrete usa o fuso horário do aparelho e é enviado apenas se o nome salvo nele ainda não tiver um registro naquele dia. O agendador do GitHub Actions verifica os horários a cada cinco minutos; como o GitHub pode atrasar execuções programadas, 22h30 é um horário aproximado. A entrega também depende do navegador, do sistema operacional e da conexão do aparelho.
+
+### Configurar os segredos
+
+1. Gere as chaves VAPID e um token aleatório localmente. O comando imprime valores secretos; não compartilhe a saída nem a envie ao Git:
+
+   ```powershell
+   dotnet run --project devocional.csproj -- --generate-reminder-secrets
+   ```
+
+2. No serviço Web do Render, adicione estas variáveis em **Environment** e faça um deploy:
+   - `VAPID_PUBLIC_KEY`: chave pública gerada.
+   - `VAPID_PRIVATE_KEY`: chave privada gerada; mantenha-a secreta.
+   - `REMINDER_CRON_TOKEN`: token aleatório gerado; mantenha-o secreto.
+   - `VAPID_SUBJECT`: `https://devocionaldiario.onrender.com/`.
+
+3. No GitHub, em **Settings → Secrets and variables → Actions**, crie o segredo `REMINDER_CRON_TOKEN` com o mesmo token usado no Render e a variável `RENDER_APP_URL` com `https://devocionaldiario.onrender.com`.
+
+4. No celular, abra o site em HTTPS, informe o nome usado no calendário e toque em **Ativar lembrete**. Aceite as notificações. No iPhone/iPad, use **Compartilhar → Adicionar à Tela de Início**, abra o app instalado e ative o lembrete por lá. O aparelho precisa permitir notificações; o modo de economia de bateria ou as definições do sistema podem atrasá-las.
+
+O nome e fuso horário de cada aparelho, junto com a inscrição push, ficam no PostgreSQL. Os dados existentes são preservados; a tabela de inscrições é criada automaticamente. Para remover o lembrete, use **Desativar** no mesmo aparelho. A chamada manual **Actions → Enviar lembretes do devocional → Run workflow** pode validar o agendador depois da configuração; em outro horário, ela não envia notificações.
+
+O site não tem login: nomes não comprovam identidade e qualquer visitante pode registrar-se em nome de outra pessoa. Assim, um registro com o mesmo nome pode suprimir o lembrete de outro aparelho. A inscrição push é um identificador privado do aparelho e não deve ser compartilhada. Para isolamento real por pessoa é necessário adicionar autenticação.
+
+O Render gratuito pode hibernar quando fica sem tráfego; o agendador envia verificações periódicas para manter o lembrete funcionando, mas isso pode consumir as horas gratuitas do serviço. Um atraso maior que 15 minutos entre execuções pode causar uma hibernação e atrasar o envio até o serviço despertar.
