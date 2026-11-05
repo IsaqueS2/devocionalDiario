@@ -12,6 +12,11 @@ let displayedMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 let records = {};
 let isLoading = false;
 
+function setStatus(message, isError = false) {
+  statusMessage.textContent = message;
+  statusMessage.classList.toggle("is-error", isError);
+}
+
 try {
   participantInput.value = localStorage.getItem("devocional.participant") || "";
 } catch {
@@ -28,7 +33,9 @@ document.querySelector("#name-form").addEventListener("submit", (event) => {
   event.preventDefault();
   participantInput.blur();
 });
+window.addEventListener("resize", updateMonthTitle);
 participantInput.addEventListener("input", () => {
+  setStatus("");
   try {
     localStorage.setItem("devocional.participant", participantInput.value.trim());
   } catch {
@@ -42,6 +49,13 @@ function changeMonth(offset) {
   loadMonth();
 }
 
+function updateMonthTitle() {
+  const options = window.matchMedia("(max-width: 430px)").matches
+    ? { month: "short", year: "numeric" }
+    : { month: "long", year: "numeric" };
+  monthTitle.textContent = displayedMonth.toLocaleDateString("pt-BR", options);
+}
+
 function dateKey(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -52,10 +66,16 @@ function createDayCard(day, year, month) {
   const people = records[key] || [];
   const currentName = participantInput.value.trim();
   const hasMarked = currentName.length > 0 && people.some((person) => person.toLocaleLowerCase() === currentName.toLocaleLowerCase());
-  const card = document.createElement("article");
+  const card = document.createElement("button");
+  const dateLabel = date.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
   card.className = "day-card";
+  card.type = "button";
+  card.disabled = isLoading;
   if (dateKey(year, month, day) === dateKey(now.getFullYear(), now.getMonth(), now.getDate())) {
     card.classList.add("is-today");
+  }
+  if (hasMarked) {
+    card.classList.add("is-marked");
   }
 
   const number = document.createElement("span");
@@ -64,26 +84,42 @@ function createDayCard(day, year, month) {
   card.append(number);
 
   if (people.length > 0) {
-    const peopleList = document.createElement("div");
-    peopleList.className = "day-people";
-    peopleList.setAttribute("aria-label", `Registrado por ${people.join(", ")}`);
-    for (const person of people) {
-      const chip = document.createElement("span");
-      chip.className = "person-chip";
-      chip.textContent = person;
-      peopleList.append(chip);
+    const markers = document.createElement("span");
+    markers.className = "day-markers";
+    markers.setAttribute("aria-hidden", "true");
+
+    for (let index = 0; index < Math.min(people.length, 3); index += 1) {
+      const marker = document.createElement("span");
+      marker.className = "day-marker";
+      markers.append(marker);
     }
-    card.append(peopleList);
+    if (people.length > 3) {
+      const more = document.createElement("span");
+      more.className = "day-more";
+      more.textContent = `+${people.length - 3}`;
+      markers.append(more);
+    }
+
+    card.append(markers);
+  } else {
+    const markerSpace = document.createElement("span");
+    markerSpace.className = "day-markers";
+    markerSpace.setAttribute("aria-hidden", "true");
+    card.append(markerSpace);
   }
 
-  const action = document.createElement("button");
-  action.type = "button";
-  action.className = `day-action${hasMarked ? " is-marked" : ""}`;
-  action.textContent = isLoading ? "..." : hasMarked ? "✓ Registrado" : "+ Marcar";
-  action.disabled = isLoading || !currentName;
-  action.setAttribute("aria-label", `${hasMarked ? "Desmarcar" : "Marcar"} devocional em ${date.toLocaleDateString("pt-BR")}`);
-  action.addEventListener("click", () => toggleRecord(key));
-  card.append(action);
+  const action = hasMarked
+    ? "Seu devocional está registrado. Toque para desmarcar."
+    : "Toque para registrar seu devocional.";
+  card.setAttribute(
+    "aria-label",
+    `${dateLabel}. ${people.length > 0 ? `${people.length} ${people.length === 1 ? "registro" : "registros"}: ${people.join(", ")}. ` : "Sem registros. "}${currentName ? action : "Digite seu nome para registrar."}`
+  );
+  card.setAttribute("aria-pressed", String(hasMarked));
+  card.title = people.length > 0
+    ? `${dateLabel}: ${people.join(", ")}`
+    : `${dateLabel}: sem registros`;
+  card.addEventListener("click", () => toggleRecord(key));
 
   return card;
 }
@@ -93,9 +129,8 @@ function renderCalendar() {
   const month = displayedMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const mondayFirstOffset = (new Date(year, month, 1).getDay() + 6) % 7;
-  const monthName = displayedMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
-  monthTitle.textContent = monthName;
+  updateMonthTitle();
   calendar.replaceChildren();
 
   for (let index = 0; index < mondayFirstOffset; index += 1) {
@@ -111,7 +146,8 @@ function renderCalendar() {
 
   const recordedDays = Object.values(records).filter((people) => people.length > 0).length;
   progressCount.textContent = `${recordedDays}/${daysInMonth}`;
-  progressCaption.textContent = `${recordedDays} ${recordedDays === 1 ? "dia registrado" : "dias registrados"} de ${daysInMonth}`;
+  progressCount.setAttribute("aria-label", `${recordedDays} de ${daysInMonth} dias com registro`);
+  progressCaption.textContent = `${recordedDays} ${recordedDays === 1 ? "dia com registro" : "dias com registro"} de ${daysInMonth}`;
   const percentage = Math.round((recordedDays / daysInMonth) * 100);
   progressFill.style.width = `${percentage}%`;
   progressBar.setAttribute("aria-valuenow", String(percentage));
@@ -121,7 +157,7 @@ async function loadMonth() {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth() + 1;
   isLoading = true;
-  statusMessage.textContent = "";
+  setStatus("Carregando os registros...");
   renderCalendar();
 
   try {
@@ -131,27 +167,28 @@ async function loadMonth() {
     }
     records = await response.json();
     isLoading = false;
+    setStatus("");
     renderCalendar();
   } catch (error) {
     isLoading = false;
     records = {};
     renderCalendar();
-    statusMessage.textContent = error instanceof Error
+    setStatus(error instanceof Error
       ? error.message
-      : "Não foi possível conectar ao aplicativo. Tente novamente.";
+      : "Não foi possível conectar ao aplicativo. Tente novamente.", true);
   }
 }
 
 async function toggleRecord(date) {
   const usuario = participantInput.value.trim();
   if (!usuario) {
-    statusMessage.textContent = "Digite seu nome antes de registrar um devocional.";
+    setStatus("Digite seu nome antes de registrar um devocional.", true);
     participantInput.focus();
     return;
   }
 
   isLoading = true;
-  statusMessage.textContent = "";
+  setStatus("Salvando seu registro...");
   renderCalendar();
 
   try {
@@ -168,9 +205,9 @@ async function toggleRecord(date) {
   } catch (error) {
     isLoading = false;
     renderCalendar();
-    statusMessage.textContent = error instanceof Error
+    setStatus(error instanceof Error
       ? error.message
-      : "Não foi possível salvar o registro. Tente novamente.";
+      : "Não foi possível salvar o registro. Tente novamente.", true);
   }
 }
 
