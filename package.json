@@ -1,0 +1,12 @@
+{
+  "name": "devocional",
+  "private": true,
+  "scripts": {
+    "build": "dotnet build devocional.csproj --configuration Release",
+    "start": "dotnet run --project devocional.csproj"
+  },
+  "dependencies": {
+    "@neon/config": "^1.11.1",
+    "@neon/env": "^1.6.13"
+  }
+}

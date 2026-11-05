@@ -3,16 +3,26 @@ using System.Text;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-var connectionString = builder.Configuration["NEON_CONNECTION_STRING"];
-if (string.IsNullOrWhiteSpace(connectionString))
+
+if (string.IsNullOrWhiteSpace(builder.Configuration["DATABASE_URL"]))
 {
-    connectionString = builder.Configuration.GetConnectionString("Default");
+    var localDatabaseUrl = ReadLocalDatabaseUrl(builder.Environment.ContentRootPath);
+    if (!string.IsNullOrWhiteSpace(localDatabaseUrl))
+    {
+        builder.Configuration["DATABASE_URL"] = localDatabaseUrl;
+    }
 }
+
+var databaseUrl = builder.Configuration["DATABASE_URL"];
+var connectionString = !string.IsNullOrWhiteSpace(databaseUrl)
+    ? ToNpgsqlConnectionString(databaseUrl)
+    : builder.Configuration["NEON_CONNECTION_STRING"]
+        ?? builder.Configuration.GetConnectionString("Default");
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "Configure NEON_CONNECTION_STRING ou ConnectionStrings:Default com uma conexão PostgreSQL.");
+        "Configure DATABASE_URL, NEON_CONNECTION_STRING ou ConnectionStrings:Default com uma conexão PostgreSQL.");
 }
 
 await using var dataSource = NpgsqlDataSource.Create(connectionString);
@@ -161,6 +171,105 @@ static async Task<IResult> ToggleRecordAsync(RegistroDTO? dto, NpgsqlDataSource 
     }
 
     return Results.Ok(new { Data = data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Pessoas = pessoas });
+}
+
+static string? ReadLocalDatabaseUrl(string contentRootPath)
+{
+    foreach (var fileName in new[] { ".env.local", ".env" })
+    {
+        var path = Path.Combine(contentRootPath, fileName);
+        if (!File.Exists(path))
+        {
+            continue;
+        }
+
+        foreach (var line in File.ReadLines(path))
+        {
+            var trimmedLine = line.Trim();
+            if (trimmedLine.StartsWith("export ", StringComparison.Ordinal))
+            {
+                trimmedLine = trimmedLine["export ".Length..].TrimStart();
+            }
+
+            if (trimmedLine.StartsWith('#') ||
+                !trimmedLine.StartsWith("DATABASE_URL=", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var value = trimmedLine["DATABASE_URL=".Length..].Trim();
+            if (value.Length >= 2 &&
+                ((value[0] == '"' && value[^1] == '"') ||
+                 (value[0] == '\'' && value[^1] == '\'')))
+            {
+                value = value[1..^1];
+            }
+
+            return value;
+        }
+    }
+
+    return null;
+}
+
+static string ToNpgsqlConnectionString(string databaseUrl)
+{
+    if (!Uri.TryCreate(databaseUrl, UriKind.Absolute, out var uri) ||
+        (uri.Scheme != "postgres" && uri.Scheme != "postgresql"))
+    {
+        return databaseUrl;
+    }
+
+    var userInfo = uri.GetComponents(UriComponents.UserInfo, UriFormat.Unescaped);
+    var separator = userInfo.IndexOf(':');
+    if (separator <= 0)
+    {
+        throw new InvalidOperationException("DATABASE_URL precisa incluir usuário e senha.");
+    }
+
+    var connectionString = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.IsDefaultPort ? 5432 : uri.Port,
+        Database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/')),
+        Username = userInfo[..separator],
+        Password = userInfo[(separator + 1)..],
+        SslMode = SslMode.Require,
+        Pooling = true
+    };
+
+    foreach (var parameter in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+    {
+        var parts = parameter.Split('=', 2);
+        var name = Uri.UnescapeDataString(parts[0]).ToLowerInvariant();
+        var value = parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+
+        switch (name)
+        {
+            case "sslmode":
+                var sslMode = value.Replace("-", string.Empty, StringComparison.Ordinal);
+                if (!Enum.TryParse<SslMode>(sslMode, ignoreCase: true, out var parsedSslMode))
+                {
+                    throw new InvalidOperationException($"DATABASE_URL contém SSL Mode inválido: {value}.");
+                }
+
+                connectionString.SslMode = parsedSslMode;
+                break;
+            case "channel_binding":
+                if (!Enum.TryParse<ChannelBinding>(value, ignoreCase: true, out var channelBinding))
+                {
+                    throw new InvalidOperationException($"DATABASE_URL contém channel_binding inválido: {value}.");
+                }
+
+                connectionString.ChannelBinding = channelBinding;
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"DATABASE_URL contém um parâmetro não suportado pelo Npgsql: {name}.");
+        }
+    }
+
+    return connectionString.ConnectionString;
 }
 
 record RegistroDTO(string Data, string Usuario);
